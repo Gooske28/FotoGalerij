@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foto Galerij</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: black; color: white; text-align: center; font-family: Arial, sans-serif; }
+        h1 { color: limegreen; }
+        .gallery { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .gallery img { width: 150px; height: 100px; cursor: pointer; border: 2px solid limegreen; }
+        #lightbox { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); }
+        #lightbox img { max-width: 90%; max-height: 90%; margin: auto; display: block; }
+        .upload { margin: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Foto Galerij</h1>
+    <input type="file" id="fileInput" class="upload" accept="image/*" multiple>
+    <div class="gallery" id="gallery"></div>
+    <div id="lightbox" onclick="this.style.display='none'">
+        <img id="lightboxImg">
+    </div>
+    <button onclick="startSlideshow()">Start Diavoorstelling</button>
+    <script>
+        const SUPABASE_URL = "https://aafrypwtdyzyeafkdcss.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhZnJ5cHd0ZHl6eWVhZmtkY3NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA3NjgzODgsImV4cCI6MjA1NjM0NDM4OH0.83hDEpvtKh8mTHei4frNn2qUNqayflZLJJ2brxwpLlA";
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const BUCKET_NAME = "foto-galerij";
+
+        async function uploadImage(file) {
+            const fileName = `${Date.now()}-${file.name}`;
+            const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, file);
+            if (error) {
+                console.error("Upload error:", error);
+                return null;
+            }
+            return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${fileName}`;
+        }
+
+        document.getElementById('fileInput').addEventListener('change', async function(event) {
+            const files = event.target.files;
+            for (let file of files) {
+                const imageUrl = await uploadImage(file);
+                if (imageUrl) {
+                    addImageToGallery(imageUrl);
+                }
+            }
+        });
+
+        async function loadImages() {
+            const { data, error } = await supabase.storage.from(BUCKET_NAME).list();
+            if (error) {
+                console.error("Error fetching images:", error);
+                return;
+            }
+            data.forEach(file => {
+                const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${file.name}`;
+                addImageToGallery(imageUrl);
+            });
+        }
+
+        function addImageToGallery(src) {
+            const img = document.createElement('img');
+            img.src = src;
+            img.onclick = function() { showLightbox(img.src); };
+            document.getElementById('gallery').appendChild(img);
+        }
+
+        function showLightbox(src) {
+            document.getElementById('lightboxImg').src = src;
+            document.getElementById('lightbox').style.display = 'flex';
+        }
+        
+        function startSlideshow() {
+            const images = document.querySelectorAll('.gallery img');
+            if (images.length === 0) return;
+            let index = 0;
+            function nextImage() {
+                if (index >= images.length) index = 0;
+                showLightbox(images[index].src);
+                index++;
+            }
+            nextImage();
+            setInterval(nextImage, 3000);
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadImages);
+    </script>
+</body>
+</html>
